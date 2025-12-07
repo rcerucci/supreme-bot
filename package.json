@@ -1,0 +1,16 @@
+{
+  "name": "supreme-bot",
+  "version": "1.0.0",
+  "description": "Supreme Overlay Trading Bot - AI-powered analysis",
+  "main": "api/analyze.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": ["trading", "forex", "ai", "gemini", "technical-analysis"],
+  "author": "rcerucci",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0"
+  }
+}
