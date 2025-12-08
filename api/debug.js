@@ -1,7 +1,7 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const API_KEY = process.env.GOOGLE_API_KEY;
-const MODEL = 'gemini-2.5-flash-lite';
+const MODEL = 'gemini-2.5-flash';
 
 const CALIBRATION_PROMPT = `
 Você é um sensor de precisão de gráficos. Descreva LOCALIZAÇÕES EXATAS usando o sistema de coordenadas abaixo.
@@ -115,7 +115,7 @@ module.exports = async (req, res) => {
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
-                temperature: 0.05,
+                temperature: 0.01,
                 maxOutputTokens: 1200,
                 thinkingConfig: { thinkingBudget: 0 }
             }
