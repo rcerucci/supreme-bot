@@ -12,7 +12,7 @@ response = requests.post(
     'https://supreme-bot-red.vercel.app/api/analyze',
     headers={'Content-Type': 'application/json'},
     json={
-        'sessionId': '1dd38b9c-94e1-4790-9685-f89fb13d04a5',
+        'sessionId': 'e1d40960-737b-4453-afd4-df35249b2ce7',
         'screenshot': b64
     }
 )
