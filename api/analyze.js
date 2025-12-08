@@ -1,5 +1,4 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getSession } = require('../lib/redis/client');
 const SYSTEM_INSTRUCTION = require('../lib/systemInstruction');
 
 const API_KEY = process.env.GOOGLE_API_KEY;
@@ -14,27 +13,18 @@ module.exports = async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     
     try {
-        const { screenshot, sessionId } = req.body;
+        const { screenshot } = req.body;
         
-        if (!screenshot || !sessionId) {
+        if (!screenshot) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Screenshot and sessionId required'
-            });
-        }
-        
-        // Validar sessão (apenas para controle)
-        const sessionData = await getSession(sessionId);
-        if (!sessionData) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'Session not found'
+                message: 'Screenshot is required'
             });
         }
         
         const genAI = new GoogleGenerativeAI(API_KEY);
         
-        // MÉTODO PATRIGESTOR - Prompt + Imagem (SEM systemInstruction, SEM chat)
+        // Método PatriGestor - stateless
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
@@ -43,7 +33,6 @@ module.exports = async (req, res) => {
             }
         });
         
-        // Análise STATELESS - cada imagem é independente
         const result = await model.generateContent([
             SYSTEM_INSTRUCTION,
             {
@@ -81,8 +70,7 @@ module.exports = async (req, res) => {
                 timestamp: new Date().toISOString(),
                 tokens_input: usage?.promptTokenCount || 0,
                 tokens_output: usage?.candidatesTokenCount || 0,
-                model: MODEL,
-                sessionId
+                model: MODEL
             }
         });
         
