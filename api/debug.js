@@ -3,47 +3,94 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
-const DEBUG_PROMPT = `
-Analise este gráfico forex M5 e responda TODAS as perguntas abaixo de forma CONCISA mas COMPLETA.
+const CALIBRATION_PROMPT = `
+Você é um sensor de precisão de gráficos. Descreva LOCALIZAÇÕES EXATAS usando o sistema de coordenadas abaixo.
 
-1. ÚLTIMOS 3 CANDLES (extrema direita):
-   - Candle 1: COR (verde/vermelho/cinza/cyan/magenta), TAMANHO vs candles vermelhos do meio
-   - Candle 2: COR, TAMANHO relativo
-   - Candle 3: COR, TAMANHO relativo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SISTEMA DE COORDENADAS HORIZONTAL:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-2. SETAS NO GRÁFICO:
-   - Tem setas? QUANTAS no total?
-   - COR das setas?
-   - ONDE estão? (últimos 3 candles / meio / esquerda)
-   - Direção: ↑ ou ↓?
+Divida o gráfico horizontalmente em 10 zonas (0% a 100%):
+[0-10%] [10-20%] [20-30%] [30-40%] [40-50%] [50-60%] [60-70%] [70-80%] [80-90%] [90-100%]
 
-3. BANDAS/LINHAS:
-   - Quantas linhas ACIMA do preço?
-   - Quantas linhas ABAIXO?
-   - Cor das linhas superiores?
-   - Cor das linhas inferiores?
-   - Tem linha amarela no meio?
+**OS 3 ÚLTIMOS CANDLES** sempre estão em [90-100%] (extrema direita)
 
-4. CAIXA/RETÂNGULO:
-   - Tem caixa desenhada? COR?
-   - ONDE COMEÇA a caixa? (início/meio/final do gráfico)
-   - ONDE TERMINA? (meio/final/extrema direita)
-   - Tem texto na caixa? O quê?
-   - DENTRO da caixa: candles verdes/vermelhos/misturados?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. IDENTIFIQUE OS 3 ÚLTIMOS CANDLES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-5. HISTOGRAMA (últimas 5 barras):
-   - Cores das 5 últimas barras?
-   - Tamanhos (grande/médio/pequeno)?
+Na zona [90-100%] (extrema direita):
+- Candle 1 (mais à direita): COR que você vê?
+- Candle 2 (segundo): COR que você vê?
+- Candle 3 (terceiro): COR que você vê?
 
-6. TEXTO SUPERIOR ESQUERDO:
-   - Consegue ler "Bias:"? Qual valor?
-   - Consegue ler "Stop:"? Qual valor?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. CAIXA/RETÂNGULO - LOCALIZAÇÃO PRECISA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-7. OUTROS:
-   - Par de moedas?
-   - Timeframe (M1/M5/H1)?
+Você vê caixa desenhada? Se SIM:
 
-RESPONDA TODAS AS 7 SEÇÕES DE FORMA OBJETIVA E DIRETA.
+COR que você vê: (use SUA descrição natural)
+
+BORDA ESQUERDA da caixa está em qual zona?
+[0-10%] [10-20%] [20-30%] [30-40%] [40-50%] [50-60%] [60-70%] [70-80%] [80-90%] [90-100%]
+
+BORDA DIREITA da caixa está em qual zona?
+[0-10%] [10-20%] [20-30%] [30-40%] [40-50%] [50-60%] [60-70%] [70-80%] [80-90%] [90-100%]
+
+**PERGUNTA CRÍTICA:**
+A borda DIREITA da caixa está:
+A) Antes da zona [90-100%] (não toca os 3 últimos candles)
+B) Dentro da zona [90-100%] (cobre os 3 últimos candles)
+
+Escolha A ou B.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. SETAS - CONTE POR ZONA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+COR das setas que você vê: (use SUA descrição)
+
+CONTE quantas setas em CADA zona:
+- Zona [0-30%]: __ setas
+- Zona [30-60%]: __ setas  
+- Zona [60-90%]: __ setas
+- Zona [90-100%] (3 últimos candles): __ setas
+
+TOTAL de setas: __
+
+**PERGUNTAS CRÍTICAS:**
+- Há ALGUMA seta na zona [90-100%]? SIM / NÃO
+- Todas as setas estão ANTES da zona [90-100%]? SIM / NÃO
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. BANDAS - CONFIRMAÇÃO RÁPIDA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Quantas linhas ACIMA do preço?
+- Quantas linhas ABAIXO?
+- COR linhas superiores (sua descrição):
+- COR linhas inferiores (sua descrição):
+- Tem linha no MEIO? COR?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. HISTOGRAMA - ÚLTIMAS 5 BARRAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Da direita para esquerda:
+1. COR:
+2. COR:
+3. COR:
+4. COR:
+5. COR:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FORMATO DE RESPOSTA:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use números e respostas diretas. Seja CONSISTENTE nas descrições de cores.
+
+RESPONDA EM FORMATO ESTRUTURADO SEGUINDO AS 5 SEÇÕES ACIMA.
 `;
 
 module.exports = async (req, res) => {
@@ -68,14 +115,14 @@ module.exports = async (req, res) => {
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 1500,
+                temperature: 0.05,
+                maxOutputTokens: 1200,
                 thinkingConfig: { thinkingBudget: 0 }
             }
         });
         
         const result = await model.generateContent([
-            DEBUG_PROMPT,
+            CALIBRATION_PROMPT,
             {
                 inlineData: {
                     data: screenshot,
