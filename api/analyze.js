@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const SYSTEM_INSTRUCTION = require('../lib/systemInstruction');
 
 const API_KEY = process.env.GOOGLE_API_KEY;
-const MODEL = process.env.VERTEX_MODEL || 'gemini-2.5-flash-lite';
+const MODEL = 'gemini-2.5-flash-lite';
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -64,7 +64,7 @@ module.exports = async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Error:', error.message);
+        console.error('Error:', error.message);
         return res.status(500).json({
             status: 'error',
             message: error.message
