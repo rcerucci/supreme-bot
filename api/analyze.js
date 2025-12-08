@@ -16,37 +16,27 @@ module.exports = async (req, res) => {
     try {
         const { screenshot, sessionId } = req.body;
         
-        if (!screenshot) {
+        if (!screenshot || !sessionId) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Screenshot is required'
-            });
-        }
-        
-        if (!sessionId) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'SessionId is required'
+                message: 'Screenshot and sessionId required'
             });
         }
         
         const sessionData = await getSession(sessionId);
-        
         if (!sessionData) {
             return res.status(404).json({
                 status: 'error',
-                message: 'Session not found or expired'
+                message: 'Session not found'
             });
         }
         
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
             model: MODEL,
-            systemInstruction: SYSTEM_INSTRUCTION,
             generationConfig: {
                 temperature: 0.1,
-                responseMimeType: 'application/json',
-                maxOutputTokens: 500,
+                // REMOVIDO responseMimeType
                 thinkingConfig: {
                     thinkingBudget: 0
                 }
@@ -69,7 +59,7 @@ module.exports = async (req, res) => {
         
         const text = result.response.text();
         
-        // 🎯 PARSE ROBUSTO (método comprovado 1000x)
+        // Parse robusto (método PatriGestor)
         let analysis;
         try {
             let jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -80,7 +70,7 @@ module.exports = async (req, res) => {
             console.error('❌ Parse failed:', text);
             return res.status(500).json({
                 status: 'error',
-                message: 'Invalid JSON from AI',
+                message: 'JSON parse failed: ' + parseError.message,
                 rawResponse: text.substring(0, 500)
             });
         }
