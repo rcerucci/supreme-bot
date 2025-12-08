@@ -2,7 +2,7 @@ import base64
 import requests
 
 # Converter imagem para base64
-with open('../uploads/1765149276049_image.png', 'rb') as f:
+with open('../uploads/1765149276053_image.png', 'rb') as f:
     img_data = f.read()
     b64 = base64.b64encode(img_data).decode('utf-8')
 
