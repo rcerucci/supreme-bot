@@ -23,6 +23,7 @@ module.exports = async (req, res) => {
             });
         }
         
+        // Validar sessão (apenas para controle)
         const sessionData = await getSession(sessionId);
         if (!sessionData) {
             return res.status(404).json({
@@ -32,34 +33,30 @@ module.exports = async (req, res) => {
         }
         
         const genAI = new GoogleGenerativeAI(API_KEY);
+        
+        // MÉTODO PATRIGESTOR - Prompt + Imagem (SEM systemInstruction, SEM chat)
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
                 temperature: 0.1,
-                // REMOVIDO responseMimeType
-                thinkingConfig: {
-                    thinkingBudget: 0
-                }
+                thinkingConfig: { thinkingBudget: 0 }
             }
         });
         
-        const chat = model.startChat({
-            history: sessionData.history
-        });
-        
-        const result = await chat.sendMessage([
+        // Análise STATELESS - cada imagem é independente
+        const result = await model.generateContent([
+            SYSTEM_INSTRUCTION,
             {
                 inlineData: {
                     data: screenshot,
                     mimeType: 'image/png'
                 }
-            },
-            { text: 'Analise este gráfico.' }
+            }
         ]);
         
         const text = result.response.text();
         
-        // Parse robusto (método PatriGestor)
+        // Parse robusto
         let analysis;
         try {
             let jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -70,7 +67,7 @@ module.exports = async (req, res) => {
             console.error('❌ Parse failed:', text);
             return res.status(500).json({
                 status: 'error',
-                message: 'JSON parse failed: ' + parseError.message,
+                message: 'JSON parse failed',
                 rawResponse: text.substring(0, 500)
             });
         }
