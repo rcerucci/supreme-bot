@@ -5,15 +5,6 @@ const SYSTEM_INSTRUCTION = require('../lib/systemInstruction');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
-// Função helper para extrair JSON válido
-function extractJSON(text) {
-    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start === -1 || end === -1) throw new Error('No JSON found');
-    return JSON.parse(text.substring(start, end + 1));
-}
-
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -35,11 +26,10 @@ module.exports = async (req, res) => {
         if (!sessionId) {
             return res.status(400).json({
                 status: 'error',
-                message: 'SessionId is required. Call /api/session/start first.'
+                message: 'SessionId is required'
             });
         }
         
-        // Recuperar sessão (apenas para validar)
         const sessionData = await getSession(sessionId);
         
         if (!sessionData) {
@@ -49,7 +39,6 @@ module.exports = async (req, res) => {
             });
         }
         
-        // Criar modelo
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
             model: MODEL,
@@ -64,12 +53,10 @@ module.exports = async (req, res) => {
             }
         });
         
-        // CRIAR CHAT COM APENAS FEW-SHOT (SEM HISTÓRICO DE ANÁLISES)
         const chat = model.startChat({
-            history: sessionData.history  // Apenas os 9 exemplos fixos
+            history: sessionData.history
         });
         
-        // Enviar imagem (ANÁLISE INDEPENDENTE)
         const result = await chat.sendMessage([
             {
                 inlineData: {
@@ -82,21 +69,20 @@ module.exports = async (req, res) => {
         
         const text = result.response.text();
         
-        // Parse robusto
+        // 🎯 PARSE ROBUSTO (método comprovado 1000x)
         let analysis;
         try {
-            analysis = JSON.parse(text);
-        } catch {
-            try {
-                analysis = extractJSON(text);
-            } catch (extractError) {
-                console.error('Parse failed:', text);
-                return res.status(500).json({
-                    status: 'error',
-                    message: 'Invalid JSON from AI',
-                    rawResponse: text.substring(0, 500)
-                });
-            }
+            let jsonText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
+            if (jsonMatch) jsonText = jsonMatch[0];
+            analysis = JSON.parse(jsonText);
+        } catch (parseError) {
+            console.error('❌ Parse failed:', text);
+            return res.status(500).json({
+                status: 'error',
+                message: 'Invalid JSON from AI',
+                rawResponse: text.substring(0, 500)
+            });
         }
         
         const usage = result.response.usageMetadata;
@@ -114,7 +100,7 @@ module.exports = async (req, res) => {
         });
         
     } catch (error) {
-        console.error('Error:', error.message);
+        console.error('❌ Error:', error.message);
         return res.status(500).json({
             status: 'error',
             message: error.message
