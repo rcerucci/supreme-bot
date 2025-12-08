@@ -4,89 +4,185 @@ const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
 const DEBUG_PROMPT = `
-Você é um analisador preciso de gráficos forex. Descreva EXATAMENTE o que vê, sem interpretar.
+Você é um analisador técnico de gráficos forex. Descreva TUDO que vê, sem omitir nenhum elemento.
+
+VOCÊ DEVE RESPONDER TODAS AS 7 SEÇÕES ABAIXO. NÃO OMITA NENHUMA.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. ÚLTIMOS 3 CANDLES (extrema direita do gráfico):
+SEÇÃO 1: ÚLTIMOS 3 CANDLES (extrema direita)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CANDLE 1 (mais à direita):
-- COR: (verde escuro, verde claro, vermelho escuro, vermelho claro, cinza, cyan/turquesa, rosa/magenta, outra?)
-- BRILHO: (neon/elétrico ou opaco/fosco?)
-- TAMANHO: (grande, médio, pequeno, muito pequeno?)
-- Comparado aos candles do meio do gráfico, este é maior, igual ou menor?
+- COR EXATA: (verde escuro fosco / verde claro fosco / verde neon / vermelho escuro fosco / vermelho claro fosco / vermelho neon / cinza / cyan elétrico / rosa/magenta / outra?)
+- BRILHO: (neon elétrico brilhante / opaco fosco?)
+- TAMANHO ABSOLUTO: (muito grande / grande / médio / pequeno / muito pequeno?)
+- TAMANHO RELATIVO: Comparado aos grandes candles vermelhos do meio do gráfico, este candle é (muito menor / menor / igual / maior)?
+- CORPO: (longo / médio / curto / quase inexistente?)
 
 CANDLE 2 (segundo da direita):
-- COR:
+- COR EXATA:
 - BRILHO:
-- TAMANHO:
+- TAMANHO ABSOLUTO:
+- TAMANHO RELATIVO aos grandes vermelhos do meio:
+- CORPO:
 
 CANDLE 3 (terceiro da direita):
-- COR:
+- COR EXATA:
 - BRILHO:
+- TAMANHO ABSOLUTO:
+- TAMANHO RELATIVO aos grandes vermelhos do meio:
+- CORPO:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 2: SETAS/SÍMBOLOS (OBRIGATÓRIO RESPONDER)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Você vê SETAS no gráfico? (SIM / NÃO)
+- Se SIM, responda TUDO abaixo:
+  - TOTAL de setas visíveis no gráfico inteiro: (conte todas)
+  - COR principal das setas: (azul claro / azul escuro / magenta/roxo / verde / vermelho / outra?)
+  - DIREÇÃO: (apontando para cima ↑ ou para baixo ↓?)
+  - LOCALIZAÇÃO GERAL das setas:
+    * Quantas estão nos ÚLTIMOS 3 candles à direita?
+    * Quantas estão no MEIO do gráfico (zona de consolidação)?
+    * Quantas estão mais à ESQUERDA?
+  - POSIÇÃO VERTICAL: As setas estão acima ou abaixo dos candles?
+  - TAMANHO das setas: (pequenas / médias / grandes?)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 3: BANDAS/LINHAS CURVAS (OBRIGATÓRIO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+LINHAS ACIMA DO PREÇO ATUAL:
+- Quantas linhas verdes/claras você vê ACIMA dos candles atuais? (conte)
+- COR EXATA dessas linhas superiores: (verde escuro fosco / verde claro / outra?)
+- ESTILO: (sólidas / pontilhadas / tracejadas?)
+- Essas linhas superiores estão separadas ou próximas entre si?
+
+LINHAS ABAIXO DO PREÇO ATUAL:
+- Quantas linhas vermelhas/escuras você vê ABAIXO dos candles atuais? (conte)
+- COR EXATA dessas linhas inferiores: (vermelho escuro fosco / vermelho claro / outra?)
+- ESTILO: (sólidas / pontilhadas / tracejadas?)
+
+LINHA CENTRAL:
+- Há uma linha no MEIO cortando o preço? (SIM / NÃO)
+- Se SIM, qual a COR? (amarela / laranja / outra?)
+- ESPESSURA dessa linha central: (fina / média / grossa?)
+
+DIREÇÃO GERAL DAS BANDAS:
+- Na extrema direita, as bandas estão: (subindo / descendo / horizontais / expandindo / contraindo?)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 4: CAIXAS/RETÂNGULOS (OBRIGATÓRIO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- Você vê alguma CAIXA ou RETÂNGULO desenhado? (SIM / NÃO)
+
+Se SIM, descreva CADA caixa que você vê:
+
+CAIXA 1:
+- COR: (amarela / cinza / verde / vermelha / outra?)
+- BRILHO: (fosca / brilhante?)
+- ESPESSURA DA BORDA: (fina / média / grossa?)
+- PREENCHIMENTO: A caixa é (só contorno / preenchida?)
+
+- LOCALIZAÇÃO HORIZONTAL (CRÍTICO):
+  - LADO ESQUERDO da caixa começa: (início do gráfico / 25% / meio 50% / 75% / perto do final?)
+  - LADO DIREITO da caixa termina: (meio do gráfico / 75% / perto da extrema direita / extrema direita / além da extrema direita?)
+  - Em barras aproximadas: A caixa cobre quantas barras/candles? (30 / 50 / 100 / 150 / mais?)
+
+- LOCALIZAÇÃO VERTICAL:
+  - Topo da caixa está em qual nível de preço aproximado?
+  - Base da caixa está em qual nível?
+  - A caixa cobre: (parte superior / parte inferior / centro do gráfico?)
+
+- CONTEÚDO INTERNO DA CAIXA:
+  - DENTRO da caixa, você vê: (só candles vermelhos / só verdes / misturados / outros elementos?)
+  - Se misturados, qual cor predomina no lado ESQUERDO interno?
+  - Qual cor predomina no lado DIREITO interno?
+  - Há setas DENTRO da caixa?
+
+- TEXTO NA CAIXA:
+  - Tem texto escrito? (SIM / NÃO)
+  - Se SIM, onde está o texto? (canto superior direito / meio / outro?)
+  - O que está escrito? (tente ler)
+
+Se há mais caixas, descreva CAIXA 2, CAIXA 3, etc.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SEÇÃO 5: HISTOGRAMA INFERIOR (OBRIGATÓRIO)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ÚLTIMAS 5 BARRAS do histograma (extrema direita):
+
+Barra 1 (mais à direita):
+- COR: (verde / vermelho / cinza / outra?)
+- TAMANHO: (muito grande / grande / médio / pequeno / muito pequeno?)
+- DIREÇÃO: (para cima / para baixo?)
+
+Barra 2:
+- COR:
 - TAMANHO:
+- DIREÇÃO:
+
+Barra 3:
+- COR:
+- TAMANHO:
+- DIREÇÃO:
+
+Barra 4:
+- COR:
+- TAMANHO:
+- DIREÇÃO:
+
+Barra 5:
+- COR:
+- TAMANHO:
+- DIREÇÃO:
+
+PADRÃO GERAL DO HISTOGRAMA:
+- As últimas 10 barras estão: (aumentando / diminuindo / estáveis?)
+- Cor predominante nas últimas 10: (verde / vermelho / cinza / misturado?)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2. SETAS/SÍMBOLOS NO GRÁFICO:
+SEÇÃO 6: TEXTO NO CANTO SUPERIOR ESQUERDO (OBRIGATÓRIO)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-- Você vê SETAS apontando para cima ou para baixo nos candles?
-- Se sim, QUANTAS setas você vê?
-- Qual a COR dessas setas? (azul, magenta/roxo, verde, vermelha, outra?)
-- ONDE estão localizadas? (nos últimos 3 candles? no meio do gráfico? mais à esquerda?)
-- As setas estão acima ou abaixo dos candles?
+Leia e transcreva TODOS os valores visíveis:
+
+- Linha 1 - Nome do indicador: (consegue ler?)
+- Linha 2 - "Bias:": (qual o valor/texto após "Bias:"?)
+- Linha 3 - "Stop:": (qual o número?)
+- Linha 4 - "Entrada:": (quais os dois valores - Upper1 e Lower1?)
+- Linha 5 - "Trailing Stop:": (quais os valores?)
+- Linha 6 - "Breakeven:": (quais os valores?)
+- Linha 7 - "Take Profit:": (quais os valores?)
+
+Se não conseguir ler algum valor, escreva "ilegível".
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-3. BANDAS/LINHAS CURVAS:
+SEÇÃO 7: OUTROS ELEMENTOS VISÍVEIS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-- Quantas linhas ACIMA do preço atual?
-- Quantas linhas ABAIXO do preço atual?
-- COR das linhas superiores:
-- COR das linhas inferiores:
-- Há uma linha no MEIO? Se sim, qual cor?
-- DIREÇÃO atual (subindo, descendo, horizontal)?
+- Há linhas horizontais tracejadas? (SIM / NÃO - onde?)
+- Há algum texto "#0", "#1" etc no gráfico? (SIM / NÃO - onde?)
+- Há outros símbolos ou marcações que não foram descritos acima?
+- Qual o par de moedas mostrado? (tente ler no topo)
+- Qual o timeframe? (tente ler no topo - M1/M5/M15/H1/etc?)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4. CAIXAS/RETÂNGULOS DESENHADOS:
+REGRAS CRÍTICAS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-- Você vê alguma CAIXA ou RETÂNGULO desenhado no gráfico?
-- Se SIM:
-  * COR da caixa: (amarela, cinza, verde, vermelha, outra?)
-  * ONDE COMEÇA (lado esquerdo da caixa)? (início do gráfico? meio do gráfico? perto dos últimos candles?)
-  * ONDE TERMINA (lado direito da caixa)? (meio do gráfico? perto dos últimos candles? extrema direita?)
-  * Tem algum TEXTO escrito na caixa? Se sim, o que está escrito?
-  * DENTRO da caixa, os candles são: (todos vermelhos? todos verdes? misturados?)
+✓ RESPONDA TODAS AS 7 SEÇÕES - não omita nenhuma
+✓ Use termos EXATOS de cores: "verde escuro fosco", "magenta/roxo", "cyan elétrico"
+✓ CONTE elementos: "7 setas", "4 linhas acima", "3 caixas"
+✓ COMPARE tamanhos: "muito menor que os candles vermelhos do meio"
+✓ DESCREVA posições: "caixa começa no meio (50%) e vai até 95% à direita"
+✓ NÃO interprete - apenas DESCREVA
+✓ Se não conseguir ver/ler algo, diga "não consigo ver" ou "ilegível"
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-5. HISTOGRAMA (parte inferior do gráfico):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ÚLTIMAS 3 BARRAS do histograma (extrema direita):
-- Barra 1 (mais à direita): COR e TAMANHO
-- Barra 2: COR e TAMANHO
-- Barra 3: COR e TAMANHO
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-6. INFORMAÇÕES NO CANTO SUPERIOR ESQUERDO:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- Consegue ler o valor de "Bias:"?
-- Consegue ler o valor de "Stop:"?
-- Consegue ler valores de "Entrada:"?
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-IMPORTANTE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✓ Seja EXTREMAMENTE específico nas cores: "verde escuro fosco", "cyan elétrico brilhante", "magenta/roxo", etc.
-✓ Use comparações: "os últimos 3 candles são MUITO MENORES que os candles do meio"
-✓ CONTE elementos: "vejo 5 setas magenta", "4 linhas verdes acima"
-✓ Descreva POSIÇÕES: "a caixa começa no meio e vai até a extrema direita"
-✓ NÃO interprete - apenas DESCREVA o que vê
-
-Responda em formato estruturado seguindo as seções acima.
+AGORA RESPONDA TODAS AS 7 SEÇÕES ACIMA.
 `;
 
 module.exports = async (req, res) => {
@@ -111,7 +207,8 @@ module.exports = async (req, res) => {
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
-                temperature: 0.1,
+                temperature: 0.05,
+                maxOutputTokens: 2048,
                 thinkingConfig: { thinkingBudget: 0 }
             }
         });
