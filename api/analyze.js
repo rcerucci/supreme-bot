@@ -1,5 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getSession, setSession } = require('../lib/redis/client');
+const { getSession } = require('../lib/redis/client');
 const SYSTEM_INSTRUCTION = require('../lib/systemInstruction');
 
 const API_KEY = process.env.GOOGLE_API_KEY;
@@ -7,19 +7,11 @@ const MODEL = 'gemini-2.5-flash-lite';
 
 // Função helper para extrair JSON válido
 function extractJSON(text) {
-    // Remover markdown code blocks
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    
-    // Tentar encontrar primeiro { até último }
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
-    
-    if (start === -1 || end === -1) {
-        throw new Error('No JSON found in response');
-    }
-    
-    const jsonStr = text.substring(start, end + 1);
-    return JSON.parse(jsonStr);
+    if (start === -1 || end === -1) throw new Error('No JSON found');
+    return JSON.parse(text.substring(start, end + 1));
 }
 
 module.exports = async (req, res) => {
@@ -47,7 +39,7 @@ module.exports = async (req, res) => {
             });
         }
         
-        // Recuperar sessão do Redis
+        // Recuperar sessão (apenas para validar)
         const sessionData = await getSession(sessionId);
         
         if (!sessionData) {
@@ -57,7 +49,7 @@ module.exports = async (req, res) => {
             });
         }
         
-        // Criar modelo com system instruction
+        // Criar modelo
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
             model: MODEL,
@@ -72,12 +64,12 @@ module.exports = async (req, res) => {
             }
         });
         
-        // Criar chat com histórico da sessão
+        // CRIAR CHAT COM APENAS FEW-SHOT (SEM HISTÓRICO DE ANÁLISES)
         const chat = model.startChat({
-            history: sessionData.history
+            history: sessionData.history  // Apenas os 9 exemplos fixos
         });
         
-        // Enviar nova imagem
+        // Enviar imagem (ANÁLISE INDEPENDENTE)
         const result = await chat.sendMessage([
             {
                 inlineData: {
@@ -90,38 +82,22 @@ module.exports = async (req, res) => {
         
         const text = result.response.text();
         
-        // Parse robusto do JSON
+        // Parse robusto
         let analysis;
         try {
             analysis = JSON.parse(text);
-        } catch (parseError) {
-            // Se JSON.parse falhar, tentar extrair JSON
+        } catch {
             try {
                 analysis = extractJSON(text);
             } catch (extractError) {
-                console.error('Failed to parse response:', text);
+                console.error('Parse failed:', text);
                 return res.status(500).json({
                     status: 'error',
-                    message: 'Invalid JSON response from AI',
+                    message: 'Invalid JSON from AI',
                     rawResponse: text.substring(0, 500)
                 });
             }
         }
-        
-        // Atualizar histórico no Redis (NÃO salvar screenshot para economizar espaço)
-        sessionData.history.push(
-            {
-                role: 'user',
-                parts: [{ text: 'Analisei novo gráfico.' }]
-            },
-            {
-                role: 'model',
-                parts: [{ text: JSON.stringify(analysis) }]
-            }
-        );
-        
-        sessionData.lastUpdate = new Date().toISOString();
-        await setSession(sessionId, sessionData, 86400);
         
         const usage = result.response.usageMetadata;
         
