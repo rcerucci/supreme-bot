@@ -5,6 +5,23 @@ const SYSTEM_INSTRUCTION = require('../lib/systemInstruction');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
+// Função helper para extrair JSON válido
+function extractJSON(text) {
+    // Remover markdown code blocks
+    text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    
+    // Tentar encontrar primeiro { até último }
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    
+    if (start === -1 || end === -1) {
+        throw new Error('No JSON found in response');
+    }
+    
+    const jsonStr = text.substring(start, end + 1);
+    return JSON.parse(jsonStr);
+}
+
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -72,25 +89,34 @@ module.exports = async (req, res) => {
         ]);
         
         const text = result.response.text();
-        const analysis = JSON.parse(text);
         
-        // Atualizar histórico no Redis
+        // Parse robusto do JSON
+        let analysis;
+        try {
+            analysis = JSON.parse(text);
+        } catch (parseError) {
+            // Se JSON.parse falhar, tentar extrair JSON
+            try {
+                analysis = extractJSON(text);
+            } catch (extractError) {
+                console.error('Failed to parse response:', text);
+                return res.status(500).json({
+                    status: 'error',
+                    message: 'Invalid JSON response from AI',
+                    rawResponse: text.substring(0, 500)
+                });
+            }
+        }
+        
+        // Atualizar histórico no Redis (NÃO salvar screenshot para economizar espaço)
         sessionData.history.push(
             {
                 role: 'user',
-                parts: [
-                    {
-                        inlineData: {
-                            data: screenshot,
-                            mimeType: 'image/png'
-                        }
-                    },
-                    { text: 'Analise este gráfico.' }
-                ]
+                parts: [{ text: 'Analisei novo gráfico.' }]
             },
             {
                 role: 'model',
-                parts: [{ text }]
+                parts: [{ text: JSON.stringify(analysis) }]
             }
         );
         
