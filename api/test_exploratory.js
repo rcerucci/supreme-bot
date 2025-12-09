@@ -1,66 +1,32 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const sharp = require('sharp');
-const fs = require('fs');
-const path = require('path');
 
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
 const EXPLORATORY_PROMPT = `
-Você é um analisador técnico de gráficos forex. Sua tarefa é DESCREVER detalhadamente o que você VÊ nesta imagem, sem tomar decisões de trading.
+Você é um analisador técnico de gráficos forex. Descreva detalhadamente o que você VÊ nesta imagem.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-INSTRUÇÕES: Descreva cada elemento visual com precisão
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 1. CANDLES (últimos 5, direita→esquerda):
+Para cada: Posição, Cor do corpo, Tamanho, Pavios
 
-📊 1. CANDLES (velas japonesas):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Observe os últimos 5 candles da DIREITA para ESQUERDA.
-Para cada candle, descreva:
-- Posição: "Candle 1 (extrema direita)", "Candle 2", etc
-- Cor do CORPO: [verde/vermelho/magenta/azul/amarelo]
-- Tamanho do corpo: [pequeno/médio/grande]
-- Pavios (sombras): [tem pavios visíveis? superior/inferior?]
+📈 2. BANDAS:
+Acima: quantidade e cor
+Abaixo: quantidade e cor
+Central: cor e direção
+Paralelismo e squeeze
 
-Exemplo: "Candle 1: Corpo verde pequeno, com pavio superior longo e pavio inferior curto"
+📦 3. BOX PRETO:
+Transcreva o texto visível
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📈 2. BANDAS (linhas paralelas):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- ACIMA do preço: Quantas linhas? Que cor?
-- ABAIXO do preço: Quantas linhas? Que cor?
-- CENTRAL: Tem uma linha no meio? Que cor?
-- DIREÇÃO: As bandas estão apontando para [CIMA/BAIXO/LATERAL]?
-- PARALELISMO: As linhas estão [paralelas/convergindo/divergindo]?
-- SQUEEZE: As bandas estão [muito juntas/abrindo/normais]?
+🟣 4. BOX ROXO:
+Existe? Onde? Texto?
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📦 3. BOX PRETO (informações de texto):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-No canto superior esquerdo há um box preto com texto branco.
-- Consegue ler o texto? Transcreva as informações visíveis.
+📊 5. HISTOGRAMA (últimas 5 barras):
+Cor e tamanho de cada
+Tendência geral
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🟣 4. BOX ROXO (consolidação):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- Há um retângulo ROXO no gráfico? [SIM/NÃO]
-- Se SIM: Onde começa? Onde termina? Tem texto?
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 5. HISTOGRAMA INFERIOR (barras verticais):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Últimas 5 barras da DIREITA para ESQUERDA:
-- Barra 1 (extrema direita): [cor], [tamanho]
-- Barra 2: [cor], [tamanho]
-- Barra 3: [cor], [tamanho]
-- Barra 4: [cor], [tamanho]
-- Barra 5: [cor], [tamanho]
-
-Cores: azul/ciano, amarelo/dourado, vermelho/laranja
-Tendência: [crescendo/decrescendo/estáveis]?
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💡 IMPORTANTE: Seja honesto, use suas cores naturais, conte cuidadosamente.
+Responda de forma estruturada.
 `;
 
 module.exports = async (req, res) => {
