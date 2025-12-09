@@ -1,32 +1,28 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const sharp = require('sharp');
 
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
 const EXPLORATORY_PROMPT = `
-Você é um analisador técnico de gráficos forex. Descreva detalhadamente o que você VÊ nesta imagem.
+Você é um analisador técnico de gráficos forex. Descreva detalhadamente o que você VÊ.
 
 📊 1. CANDLES (últimos 5, direita→esquerda):
 Para cada: Posição, Cor do corpo, Tamanho, Pavios
 
 📈 2. BANDAS:
 Acima: quantidade e cor
-Abaixo: quantidade e cor
+Abaixo: quantidade e cor  
 Central: cor e direção
-Paralelismo e squeeze
 
 📦 3. BOX PRETO:
-Transcreva o texto visível
+Transcreva o texto
 
 🟣 4. BOX ROXO:
 Existe? Onde? Texto?
 
-📊 5. HISTOGRAMA (últimas 5 barras):
+📊 5. HISTOGRAMA (últimas 5):
 Cor e tamanho de cada
 Tendência geral
-
-Responda de forma estruturada.
 `;
 
 module.exports = async (req, res) => {
@@ -37,7 +33,7 @@ module.exports = async (req, res) => {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     
-    console.log('🔍 Iniciando análise exploratória...');
+    console.log('🔍 Starting analysis...');
     
     try {
         const { screenshot } = req.body;
@@ -49,14 +45,7 @@ module.exports = async (req, res) => {
             });
         }
         
-        console.log('🔧 Processing image...');
-        const buffer = Buffer.from(screenshot, 'base64');
-        const processed = await sharp(buffer)
-            .png({ compressionLevel: 0 })
-            .toBuffer();
-        
-        const base64Image = processed.toString('base64');
-        console.log(`📊 Image size: ${(processed.length / 1024).toFixed(2)} KB`);
+        console.log('📤 Sending to Gemini (no preprocessing)...');
         
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
@@ -68,11 +57,10 @@ module.exports = async (req, res) => {
             }
         });
         
-        console.log('📤 Sending to Gemini...');
         const result = await model.generateContent([
             {
                 inlineData: {
-                    data: base64Image,
+                    data: screenshot,
                     mimeType: 'image/png'
                 }
             },
@@ -82,8 +70,7 @@ module.exports = async (req, res) => {
         const text = result.response.text();
         const usage = result.response.usageMetadata;
         
-        console.log(`✅ Analysis complete`);
-        console.log(`📊 Tokens: ${usage?.promptTokenCount} in / ${usage?.candidatesTokenCount} out`);
+        console.log(`✅ Complete: ${usage?.promptTokenCount} in / ${usage?.candidatesTokenCount} out`);
         
         return res.status(200).json({
             status: 'success',
@@ -98,12 +85,10 @@ module.exports = async (req, res) => {
         
     } catch (error) {
         console.error('❌ Error:', error.message);
-        console.error('Stack:', error.stack);
         
         return res.status(500).json({
             status: 'error',
-            message: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            message: error.message
         });
     }
 };
