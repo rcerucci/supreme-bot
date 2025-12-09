@@ -3,191 +3,81 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
-const VISUAL_REFERENCE_TABLE = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 GUIA VISUAL DO GRÁFICO FOREX
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Esta imagem contém os seguintes elementos visuais:
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 1. BOX PRETO (Canto Superior Esquerdo)                              │
-├─────────────────────────────────────────────────────────────────────┤
-│ • Fundo: PRETO sólido                                               │
-│ • Texto: BRANCO                                                     │
-│ • Contém: Nome do par, Bias (COMPRA/VENDA/NEUTRO), Stop, Entrada   │
-│ • Quantidade: 1 painel                                              │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 2. CANDLES (Velas Japonesas)                                       │
-├─────────────────────────────────────────────────────────────────────┤
-│ • VERDE (Lime):              Alta normal                            │
-│ • VERMELHO (Red):            Baixa normal                           │
-│ • BRANCO (White):            Neutro/Sem sinal                       │
-│ • AZUL DODGER (DodgerBlue):  ⭐ SINAL DE COMPRA (importante!)       │
-│ • AMARELO (Yellow):          ⭐ SINAL DE VENDA (importante!)        │
-│                                                                     │
-│ ⚠️ CRÍTICO:                                                         │
-│ • AMARELO ≠ VERMELHO (cores completamente diferentes!)             │
-│ • AZUL DODGER ≠ VERDE (cores completamente diferentes!)            │
-│ • Sinais podem NÃO estar presentes em todas as imagens             │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 3. SETAS DE SINAL (podem existir ou não)                           │
-├─────────────────────────────────────────────────────────────────────┤
-│ • SETA  AZUL DODGER (↑):  Abaixo do candle AZUL DODGER = Sinal de COMPRA  │
-│ • SETA AMARELA (↓): Acima do candle AMARELO = Sinal de VENDA       │
-│                                                                     │
-│ ⚠️ Setas sempre acompanham candles coloridos (azul ou amarelo)     │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 4. SISTEMA DE BANDAS (Total: 9 linhas)                             │
-├─────────────────────────────────────────────────────────────────────┤
-│ LINHA CENTRAL:                                                      │
-│ • BRANCA - 1 linha no meio                                          │
-│                                                                     │
-│ BANDAS SUPERIORES (4 linhas acima do preço):                       │
-│ • Banda 1 (mais próxima): CIANO CLARO (Aqua)                       │
-│ • Banda 2: AZUL CELESTE (DeepSkyBlue)                              │
-│ • Banda 3: AZUL MÉDIO (DodgerBlue)                                 │
-│ • Banda 4 (mais distante): AZUL ESCURO (RoyalBlue)                 │
-│                                                                     │
-│ BANDAS INFERIORES (4 linhas abaixo do preço):                      │
-│ • Banda 1 (mais próxima): LARANJA CLARO (OrangeRed)                │
-│ • Banda 2: LARANJA (Orange)                                         │
-│ • Banda 3: LARANJA ESCURO (DarkOrange)                             │
-│ • Banda 4 (mais distante): VERMELHO CARMESIM (Crimson)             │
-│                                                                     │
-│ Progressão visual: Claro → Escuro (conforme se afasta do preço)    │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 5. BOX ROXO (Pode existir ou não)                                  │
-├─────────────────────────────────────────────────────────────────────┤
-│ • Formato: RETÂNGULO ROXO/MAGENTA desenhado sobre os candles       │
-│ • Texto dentro: "LATERAL"                                           │
-│ • Localização: Sobre o gráfico de preços                           │
-│                                                                     │
-│ ⚠️ NÃO CONFUNDIR COM:                                               │
-│ • Texto "Supreme ROC" na parte inferior (isso é o nome do indicador)│
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 6. HISTOGRAMA INFERIOR (Supreme ROC)                                │
-├─────────────────────────────────────────────────────────────────────┤
-│ • AZUL (DodgerBlue):  Pressão compradora FORTE                     │
-│ • VERMELHO (Red):     Pressão vendedora FORTE                      │
-│ • AMARELO (Yellow):   Pressão FRACA (qualquer direção)             │
-│                                                                     │
-│ Barras verticais abaixo do gráfico principal                       │
-└─────────────────────────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`;
-
 const VERIFICATION_PROMPT = `
-${VISUAL_REFERENCE_TABLE}
+Você é um verificador LITERAL de elementos visuais em gráficos forex.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 SUA FUNÇÃO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ DIFERENÇAS CRÍTICAS DE COR:
 
-Você é um VERIFICADOR DE ELEMENTOS visuais em gráficos forex.
+AMARELO vs VERMELHO:
+- AMARELO = RGB(255, 255, 0) = Tom dourado/limão BRILHANTE
+- VERMELHO = RGB(255, 0, 0) = Tom carmesim ESCURO
+- Se parece "laranja" ou "dourado" = é AMARELO!
+- Se parece "vinho" ou "escuro" = é VERMELHO!
 
-REGRAS:
-1. Consulte a tabela acima como referência
-2. Seja LITERAL - só reporte o que você VÊ
-3. Se não vê algo claramente, diga "Não encontrado"
-4. Use EXATAMENTE as cores descritas na tabela
-5. NUNCA invente elementos
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 VERIFIQUE A IMAGEM (direita→esquerda)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**1. CANDLES (últimos 5, posição 1=extrema direita):**
-
-Posição 1:
-- Cor: [VERDE/VERMELHO/BRANCO/AZUL DODGER/AMARELO]
-- Tamanho: [pequeno/médio/grande]
-
-Posição 2:
-- Cor: [...]
-- Tamanho: [...]
-
-Posição 3:
-- Cor: [...]
-- Tamanho: [...]
-
-Posição 4:
-- Cor: [...]
-- Tamanho: [...]
-
-Posição 5:
-- Cor: [...]
-- Tamanho: [...]
-
-⚠️ Se não vê AZUL DODGER ou AMARELO, isso é normal - são sinais que podem não existir.
+AZUL DODGER vs VERDE:
+- AZUL DODGER = RGB(30, 144, 255) = Azul ciano CLARO
+- VERDE = RGB(0, 255, 0) = Verde limão PURO
+- Se parece "azul claro" ou "ciano" = é AZUL DODGER!
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**2. SETAS DE SINAL:**
+ELEMENTOS DO GRÁFICO:
 
-Setas cianas (↓): [quantidade] ou "Não encontradas"
-Setas amarelas (↑): [quantidade] ou "Não encontradas"
+1. CANDLES (5 cores possíveis):
+   [0] BRANCO = Neutro
+   [1] VERDE = Alta normal
+   [2] VERMELHO = Baixa normal (escuro!)
+   [3] AZUL DODGER = ⭐ SINAL COMPRA (com seta ciano ↓ abaixo)
+   [4] AMARELO = ⭐ SINAL VENDA (com seta amarela ↑ acima, brilhante!)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. SETAS:
+   • Ciano (↑) = Abaixo de candles AZUL DODGER
+   • Amarela (↓) = Acima de candles AMARELOS
 
-**3. BANDAS (conte cada linha individualmente):**
+3. BANDAS: 9 linhas (4 superiores + 1 central branca + 4 inferiores)
 
-Superiores (acima do preço):
-- Quantidade: [número]
-- Progressão de cores: [do mais claro ao mais escuro]
+4. BOX PRETO: Painel superior esquerdo, texto "Bias: COMPRA/VENDA/NEUTRO"
 
-Inferiores (abaixo do preço):
-- Quantidade: [número]
-- Progressão de cores: [do mais claro ao mais escuro]
+5. BOX ROXO: Retângulo roxo com texto "LATERAL" (pode não existir)
 
-Central:
-- Existe? [SIM/NÃO]
-- Cor: [...]
-
-Total de linhas: [soma]
+6. HISTOGRAMA: Barras azuis/vermelhas/amarelas na parte inferior
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ANALISE A IMAGEM (direita → esquerda):
+
+**1. CANDLES (últimos 5):**
+
+Posição 1: Cor [BRANCO/VERDE/VERMELHO/AZUL DODGER/AMARELO], Tamanho [...]
+Posição 2: Cor [...], Tamanho [...]
+Posição 3: Cor [...], Tamanho [...]
+Posição 4: Cor [...], Tamanho [...]
+Posição 5: Cor [...], Tamanho [...]
+
+**2. SETAS:**
+Cianas (↓): [N] ou "Não encontradas"
+Amarelas (↑): [N] ou "Não encontradas"
+
+**3. BANDAS:**
+Superiores: [N]
+Central: [SIM/NÃO]
+Inferiores: [N]
+Total: [soma]
 
 **4. BOX PRETO:**
+Bias: [transcreva linha]
 
+**5. BOX ROXO:**
 Existe? [SIM/NÃO]
-Linha com "Bias:": [transcreva]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**5. BOX ROXO (retângulo sobre candles):**
-
-Existe retângulo roxo sobre o gráfico? [SIM/NÃO]
-
-Se SIM:
-- Posição: [...]
-- Texto dentro: [...]
-
-Se NÃO:
-- Confirme: [Não há box roxo]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **6. HISTOGRAMA (últimas 5 barras):**
-
 Barra 1: [AZUL/VERMELHO/AMARELO], [tamanho]
-Barra 2: [cor], [tamanho]
-Barra 3: [cor], [tamanho]
-Barra 4: [cor], [tamanho]
-Barra 5: [cor], [tamanho]
+Barra 2: [...], [...]
+Barra 3: [...], [...]
+Barra 4: [...], [...]
+Barra 5: [...], [...]
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMPORTANTE: Se você vê setas AMARELAS, os candles abaixo delas são AMARELOS (não vermelhos)!
 `;
 
 module.exports = async (req, res) => {
@@ -197,8 +87,6 @@ module.exports = async (req, res) => {
     
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    
-    console.log('🔍 Starting verification...');
     
     try {
         const { screenshot } = req.body;
@@ -210,15 +98,12 @@ module.exports = async (req, res) => {
             });
         }
         
-        console.log('📤 Sending to Gemini with visual reference table...');
-        
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
-                temperature: 0.05,
-                maxOutputTokens: 2500,
-                thinkingConfig: { thinkingBudget: 0 }
+                temperature: 0.01,
+                maxOutputTokens: 1500
             }
         });
         
@@ -235,22 +120,18 @@ module.exports = async (req, res) => {
         const text = result.response.text();
         const usage = result.response.usageMetadata;
         
-        console.log(`✅ Verification complete`);
-        console.log(`📊 Tokens: ${usage?.promptTokenCount || 0} in / ${usage?.candidatesTokenCount || 0} out`);
-        
         return res.status(200).json({
             status: 'success',
             verification: text,
             tokens: {
                 input: usage?.promptTokenCount || 0,
                 output: usage?.candidatesTokenCount || 0,
-                thinking: usage?.thoughtsTokenCount || 0,
                 total: usage?.totalTokenCount || 0
             }
         });
         
     } catch (error) {
-        console.error('❌ Error:', error.message);
+        console.error('Error:', error.message);
         
         return res.status(500).json({
             status: 'error',
