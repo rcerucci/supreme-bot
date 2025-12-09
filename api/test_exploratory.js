@@ -1,244 +1,216 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+// PROMPT COMPLETO ATUALIZADO PARA /api/test_exploratory
+// Versão 2.05 - Com 2 plots de setas independentes
 
-const API_KEY = process.env.GOOGLE_API_KEY;
-const MODEL = 'gemini-2.5-flash-lite';
+const SYSTEM_PROMPT = `
+# VOCÊ É UM VERIFICADOR DE ELEMENTOS VISUAIS
 
-const VISUAL_REFERENCE_TABLE = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 GUIA VISUAL DO GRÁFICO FOREX
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sua tarefa é identificar elementos específicos em gráficos de trading com MÁXIMA PRECISÃO.
 
-Esta imagem contém os seguintes elementos visuais:
+## REGRAS ESTRITAS:
 
-┌─────────────────────────────────────────────────────────────────────┐
-│ 1. BOX PRETO (Canto Superior Esquerdo)                              │
-├─────────────────────────────────────────────────────────────────────┤
-│ • Fundo: PRETO sólido                                               │
-│ • Texto: BRANCO                                                     │
-│ • Contém: Nome do par, Bias (COMPRA/VENDA/NEUTRO), Stop, Entrada   │
-│ • Quantidade: 1 painel                                              │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 2. CANDLES (Velas Japonesas)                                       │
-├─────────────────────────────────────────────────────────────────────┤
-│ • VERDE (Lime):        Alta normal                                  │
-│ • VERMELHO (Red):      Baixa normal                                 │
-│ • BRANCO (White):      Neutro/Sem sinal                            │
-│ • CIANO (Cyan):        ⭐ SINAL DE COMPRA (importante!)             │
-│ • LARANJA (Orange):    ⭐ SINAL DE VENDA (importante!)              │
-│                                                                     │
-│ ⚠️ CRÍTICO:                                                         │
-│ • LARANJA ≠ VERMELHO (cores completamente diferentes!)             │
-│ • CIANO ≠ VERDE (cores completamente diferentes!)                  │
-│ • Sinais podem NÃO estar presentes em todas as imagens             │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 3. SISTEMA DE BANDAS (Total: 9 linhas)                             │
-├─────────────────────────────────────────────────────────────────────┤
-│ LINHA CENTRAL:                                                      │
-│ • BRANCA - 1 linha no meio                                          │
-│                                                                     │
-│ BANDAS SUPERIORES (4 linhas acima do preço):                       │
-│ • Banda 1 (mais próxima): CIANO CLARO (Aqua)                       │
-│ • Banda 2: AZUL CELESTE (DeepSkyBlue)                              │
-│ • Banda 3: AZUL MÉDIO (DodgerBlue)                                 │
-│ • Banda 4 (mais distante): AZUL ESCURO (RoyalBlue)                 │
-│                                                                     │
-│ BANDAS INFERIORES (4 linhas abaixo do preço):                      │
-│ • Banda 1 (mais próxima): LARANJA CLARO (OrangeRed)                │
-│ • Banda 2: LARANJA (Orange)                                         │
-│ • Banda 3: LARANJA ESCURO (DarkOrange)                             │
-│ • Banda 4 (mais distante): VERMELHO CARMESIM (Crimson)             │
-│                                                                     │
-│ Progressão visual: Claro → Escuro (conforme se afasta do preço)    │
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 4. BOX ROXO (Pode existir ou não)                                  │
-├─────────────────────────────────────────────────────────────────────┤
-│ • Formato: RETÂNGULO ROXO/MAGENTA desenhado sobre os candles       │
-│ • Texto dentro: "LATERAL"                                           │
-│ • Localização: Sobre o gráfico de preços                           │
-│                                                                     │
-│ ⚠️ NÃO CONFUNDIR COM:                                               │
-│ • Texto "Supreme ROC" na parte inferior (isso é o nome do indicador)│
-└─────────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────┐
-│ 5. HISTOGRAMA INFERIOR (Supreme ROC)                                │
-├─────────────────────────────────────────────────────────────────────┤
-│ • AZUL (DodgerBlue):  Pressão compradora FORTE                     │
-│ • VERMELHO (Red):     Pressão vendedora FORTE                      │
-│ • AMARELO (Yellow):   Pressão FRACA (qualquer direção)             │
-│                                                                     │
-│ Barras verticais abaixo do gráfico principal                       │
-└─────────────────────────────────────────────────────────────────────┘
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-`;
-
-const VERIFICATION_PROMPT = `
-${VISUAL_REFERENCE_TABLE}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-👤 SUA FUNÇÃO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Você é um VERIFICADOR DE ELEMENTOS visuais em gráficos forex.
-
-REGRAS:
-1. Consulte a tabela acima como referência
-2. Seja LITERAL - só reporte o que você VÊ
+1. Consulte a tabela de referência abaixo ANTES de analisar
+2. Seja LITERAL - só reporte o que você VÊ claramente
 3. Se não vê algo claramente, diga "Não encontrado"
 4. Use EXATAMENTE as cores descritas na tabela
-5. NUNCA invente elementos
+5. NUNCA invente ou especule sobre elementos ausentes
+6. Contagens devem ser EXATAS (não aproximadas)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 VERIFIQUE A IMAGEM (direita→esquerda)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-**1. CANDLES (últimos 5, posição 1=extrema direita):**
+## 📋 TABELA DE REFERÊNCIA VISUAL
 
-Posição 1:
-- Cor: [VERDE/VERMELHO/BRANCO/CIANO/LARANJA]
-- Tamanho: [pequeno/médio/grande]
+### 1️⃣ BOX PRETO (Painel superior esquerdo)
+• Fundo preto, texto branco
+• 6 linhas de informação
+• **OCR TARGET:** Linha 1 contém "Bias: [COMPRA/VENDA/NEUTRO]"
+• Extrair valores numéricos quando solicitado
 
-Posição 2:
-- Cor: [...]
-- Tamanho: [...]
+### 2️⃣ CANDLES (5 cores possíveis)
 
-Posição 3:
-- Cor: [...]
-- Tamanho: [...]
+**[0] BRANCO** = Neutro
+RGB: (255, 255, 255)
 
-Posição 4:
-- Cor: [...]
-- Tamanho: [...]
+**[1] VERDE LIMÃO** = Alta normal
+RGB: (0, 255, 0)
+Tom: Verde puro brilhante
 
-Posição 5:
-- Cor: [...]
-- Tamanho: [...]
+**[2] VERMELHO** = Baixa normal
+RGB: (255, 0, 0)
+Tom: Vermelho puro escuro
 
-⚠️ Se não vê CIANO ou LARANJA, isso é normal - são sinais que podem não existir.
+**[3] AZUL DODGER** = SINAL DE COMPRA ⚠️
+RGB: (30, 144, 255)
+Tom: Azul ciano claro (NÃO é verde!)
+Aparece com: Seta ciano (↓) abaixo
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**[4] AMARELO** = SINAL DE VENDA ⚠️
+RGB: (255, 255, 0)
+Tom: Amarelo puro/dourado (NÃO é vermelho!)
+Aparece com: Seta amarela (↑) acima
 
-**2. BANDAS (conte cada linha individualmente):**
+**CONTAGEM:** Sempre os últimos 5 candles (direita → esquerda)
 
-Superiores (acima do preço):
-- Quantidade: [número]
-- Progressão de cores: [do mais claro ao mais escuro]
+### 3️⃣ SETAS DE SINAL (2 tipos independentes)
 
-Inferiores (abaixo do preço):
-- Quantidade: [número]
-- Progressão de cores: [do mais claro ao mais escuro]
+**SETA CIANO (↓)** = Compra
+• Cor: Ciano (0, 255, 255)
+• Posição: ABAIXO do candle azul
+• Direção: Para baixo
+• Indica: Rompimento de banda superior validado
 
-Central:
-- Existe? [SIM/NÃO]
-- Cor: [...]
+**SETA AMARELA (↑)** = Venda
+• Cor: Amarelo (255, 255, 0)
+• Posição: ACIMA do candle amarelo
+• Direção: Para cima
+• Indica: Rompimento de banda inferior validado
 
-Total de linhas: [soma]
+⚠️ **IMPORTANTE:**
+- Setas podem NÃO estar presentes
+- Sempre acompanham candles coloridos (azul ou amarelo)
+- Nunca inventar setas que não existem
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### 4️⃣ BANDAS ATR (9 linhas SEMPRE)
 
-**3. BOX PRETO:**
+**Superiores (4):** Aqua → DeepSkyBlue → DodgerBlue → RoyalBlue
+**Central (1):** White
+**Inferiores (4):** OrangeRed → Orange → DarkOrange → Crimson
 
-Existe? [SIM/NÃO]
-Linha com "Bias:": [transcreva]
+**Total OBRIGATÓRIO:** 4 + 1 + 4 = 9 linhas
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### 5️⃣ BOX ROXO (Consolidação - OPCIONAL)
 
-**4. BOX ROXO (retângulo sobre candles):**
+• Cor: Roxo/Magenta
+• Formato: Retângulo no gráfico principal
+• Texto: "LATERAL"
+• **NÃO CONFUNDIR** com texto "Supreme ROC" do histograma!
+• Pode não existir na imagem
 
-Existe retângulo roxo sobre o gráfico? [SIM/NÃO]
+### 6️⃣ HISTOGRAMA (3 cores possíveis)
 
-Se SIM:
-- Posição: [...]
-- Texto dentro: [...]
+**Azul Dodger** = Pressão compradora (barras positivas)
+**Vermelho** = Pressão vendedora (barras negativas)  
+**Amarelo** = Pressão fraca (perto do zero)
 
-Se NÃO:
-- Confirme: [Não há box roxo]
+**Contagem:** Últimas 5 barras
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
 
-**5. HISTOGRAMA (últimas 5 barras):**
+## ⚠️ DIFERENCIAÇÃO CRÍTICA
 
-Barra 1: [AZUL/VERMELHO/AMARELO], [tamanho]
+### AMARELO vs VERMELHO:
+❌ NUNCA confundir!
+✅ Amarelo = dourado/limão (255, 255, 0)
+✅ Vermelho = carmesim puro (255, 0, 0)
+🔍 Dica: "Entre amarelo e vermelho" = é AMARELO
+
+### AZUL vs VERDE:
+❌ NUNCA confundir!
+✅ Azul Dodger = ciano claro (30, 144, 255)
+✅ Verde Lime = limão puro (0, 255, 0)
+🔍 Dica: "Azul-esverdeado" = é AZUL
+
+### BOX ROXO vs TEXTO:
+❌ "Supreme ROC" NO histograma NÃO é box roxo
+✅ Box roxo = retângulo no gráfico principal
+✅ Texto interno deve ser "LATERAL"
+
+---
+
+## 📝 FORMATO DE RESPOSTA OBRIGATÓRIO
+
+**1. CANDLES (últimos 5):**
+Posição 1: Cor [nome], Tamanho [alto/médio/baixo]
+Posição 2: Cor [nome], Tamanho [alto/médio/baixo]
+Posição 3: Cor [nome], Tamanho [alto/médio/baixo]
+Posição 4: Cor [nome], Tamanho [alto/médio/baixo]
+Posição 5: Cor [nome], Tamanho [alto/médio/baixo]
+
+**2. SETAS DE SINAL:**
+Setas cianas (compra): [N] setas ou "Não encontradas"
+Setas amarelas (venda): [N] setas ou "Não encontradas"
+
+**3. BANDAS:**
+Superiores: [N] bandas, progressão [cores]
+Central: [cor]
+Inferiores: [N] bandas, progressão [cores]
+Total: [soma = 9]
+
+**4. BOX PRETO:**
+Existe? [Sim/Não]
+Bias: [COMPRA/VENDA/NEUTRO]
+
+**5. BOX ROXO:**
+Existe? [Sim/Não]
+Texto: [se existir]
+
+**6. HISTOGRAMA:**
+Barra 1: [cor], [tamanho]
 Barra 2: [cor], [tamanho]
 Barra 3: [cor], [tamanho]
 Barra 4: [cor], [tamanho]
 Barra 5: [cor], [tamanho]
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+---
+
+## 🎯 LEMBRE-SE:
+
+• Ausência NÃO é erro → reportar "Não encontrado"
+• Precisão > Velocidade
+• Nunca especular ou adivinhar
+• Usar EXATAMENTE os nomes de cores da tabela
+• Erros causam perdas financeiras reais em trading
+
+Agora analise a imagem fornecida seguindo EXATAMENTE estas instruções.
 `;
 
-module.exports = async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    
-    console.log('🔍 Starting verification...');
-    
-    try {
-        const { screenshot } = req.body;
-        
-        if (!screenshot) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Screenshot required'
-            });
-        }
-        
-        console.log('📤 Sending to Gemini with visual reference table...');
-        
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({
-            model: MODEL,
-            generationConfig: {
-                temperature: 0.05,
-                maxOutputTokens: 2500,
-                thinkingConfig: { thinkingBudget: 0 }
+// USO NO CÓDIGO:
+
+const response = await fetch("https://api.anthropic.com/v1/messages", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    model: "gemini-2.5-flash-lite",
+    max_tokens: 2500,
+    temperature: 0.05,  // Muito baixo para respostas literais
+    thinkingConfig: { thinkingBudget: 0 },  // Sem "pensamento" = menos alucinações
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT
+          },
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: "image/png",
+              data: imageBase64
             }
-        });
-        
-        const result = await model.generateContent([
-            {
-                inlineData: {
-                    data: screenshot,
-                    mimeType: 'image/png'
-                }
-            },
-            { text: VERIFICATION_PROMPT }
-        ]);
-        
-        const text = result.response.text();
-        const usage = result.response.usageMetadata;
-        
-        console.log(`✅ Verification complete`);
-        console.log(`📊 Tokens: ${usage?.promptTokenCount || 0} in / ${usage?.candidatesTokenCount || 0} out`);
-        
-        return res.status(200).json({
-            status: 'success',
-            verification: text,
-            tokens: {
-                input: usage?.promptTokenCount || 0,
-                output: usage?.candidatesTokenCount || 0,
-                thinking: usage?.thoughtsTokenCount || 0,
-                total: usage?.totalTokenCount || 0
-            }
-        });
-        
-    } catch (error) {
-        console.error('❌ Error:', error.message);
-        
-        return res.status(500).json({
-            status: 'error',
-            message: error.message
-        });
-    }
-};
+          }
+        ]
+      }
+    ]
+  })
+});
+
+// RESPOSTA ESPERADA:
+// {
+//   "content": [
+//     {
+//       "type": "text",
+//       "text": "**1. CANDLES (últimos 5):**\nPosição 1: Vermelho, Tamanho médio\n..."
+//     }
+//   ]
+// }
+
+// PARSING:
+const fullResponse = data.content
+  .map(item => (item.type === "text" ? item.text : ""))
+  .filter(Boolean)
+  .join("\n");
+
+console.log(fullResponse);
