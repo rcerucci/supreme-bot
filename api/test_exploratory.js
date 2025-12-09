@@ -3,180 +3,175 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
+const VISUAL_REFERENCE_TABLE = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 GUIA VISUAL DO GRÁFICO FOREX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Esta imagem contém os seguintes elementos visuais:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 1. BOX PRETO (Canto Superior Esquerdo)                              │
+├─────────────────────────────────────────────────────────────────────┤
+│ • Fundo: PRETO sólido                                               │
+│ • Texto: BRANCO                                                     │
+│ • Contém: Nome do par, Bias (COMPRA/VENDA/NEUTRO), Stop, Entrada   │
+│ • Quantidade: 1 painel                                              │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 2. CANDLES (Velas Japonesas)                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│ • VERDE (Lime):        Alta normal                                  │
+│ • VERMELHO (Red):      Baixa normal                                 │
+│ • BRANCO (White):      Neutro/Sem sinal                            │
+│ • CIANO (Cyan):        ⭐ SINAL DE COMPRA (importante!)             │
+│ • LARANJA (Orange):    ⭐ SINAL DE VENDA (importante!)              │
+│                                                                     │
+│ ⚠️ CRÍTICO:                                                         │
+│ • LARANJA ≠ VERMELHO (cores completamente diferentes!)             │
+│ • CIANO ≠ VERDE (cores completamente diferentes!)                  │
+│ • Sinais podem NÃO estar presentes em todas as imagens             │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 3. SISTEMA DE BANDAS (Total: 9 linhas)                             │
+├─────────────────────────────────────────────────────────────────────┤
+│ LINHA CENTRAL:                                                      │
+│ • BRANCA - 1 linha no meio                                          │
+│                                                                     │
+│ BANDAS SUPERIORES (4 linhas acima do preço):                       │
+│ • Banda 1 (mais próxima): CIANO CLARO (Aqua)                       │
+│ • Banda 2: AZUL CELESTE (DeepSkyBlue)                              │
+│ • Banda 3: AZUL MÉDIO (DodgerBlue)                                 │
+│ • Banda 4 (mais distante): AZUL ESCURO (RoyalBlue)                 │
+│                                                                     │
+│ BANDAS INFERIORES (4 linhas abaixo do preço):                      │
+│ • Banda 1 (mais próxima): LARANJA CLARO (OrangeRed)                │
+│ • Banda 2: LARANJA (Orange)                                         │
+│ • Banda 3: LARANJA ESCURO (DarkOrange)                             │
+│ • Banda 4 (mais distante): VERMELHO CARMESIM (Crimson)             │
+│                                                                     │
+│ Progressão visual: Claro → Escuro (conforme se afasta do preço)    │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 4. BOX ROXO (Pode existir ou não)                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│ • Formato: RETÂNGULO ROXO/MAGENTA desenhado sobre os candles       │
+│ • Texto dentro: "LATERAL"                                           │
+│ • Localização: Sobre o gráfico de preços                           │
+│                                                                     │
+│ ⚠️ NÃO CONFUNDIR COM:                                               │
+│ • Texto "Supreme ROC" na parte inferior (isso é o nome do indicador)│
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 5. HISTOGRAMA INFERIOR (Supreme ROC)                                │
+├─────────────────────────────────────────────────────────────────────┤
+│ • AZUL (DodgerBlue):  Pressão compradora FORTE                     │
+│ • VERMELHO (Red):     Pressão vendedora FORTE                      │
+│ • AMARELO (Yellow):   Pressão FRACA (qualquer direção)             │
+│                                                                     │
+│ Barras verticais abaixo do gráfico principal                       │
+└─────────────────────────────────────────────────────────────────────┘
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`;
+
 const VERIFICATION_PROMPT = `
+${VISUAL_REFERENCE_TABLE}
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 👤 SUA FUNÇÃO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Você é um VERIFICADOR DE ELEMENTOS em gráficos forex.
-Sua tarefa é identificar e descrever APENAS o que está visível.
-Você NÃO faz análises técnicas, NÃO dá opiniões, NÃO inventa elementos.
+Você é um VERIFICADOR DE ELEMENTOS visuais em gráficos forex.
 
-REGRAS DA PERSONA:
-- Seja literal e objetivo
-- Se não vê algo claramente, diga "Não encontrado"
-- Use EXATAMENTE as cores que descrevo abaixo
-- NUNCA confunda elementos diferentes
-- Siga o formato de resposta estruturado
+REGRAS:
+1. Consulte a tabela acima como referência
+2. Seja LITERAL - só reporte o que você VÊ
+3. Se não vê algo claramente, diga "Não encontrado"
+4. Use EXATAMENTE as cores descritas na tabela
+5. NUNCA invente elementos
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 DESCRIÇÃO DO GRÁFICO QUE VOCÊ RECEBEU
+🔍 VERIFIQUE A IMAGEM (direita→esquerda)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Esta é uma imagem de gráfico forex (MetaTrader 5) que contém:
+**1. CANDLES (últimos 5, posição 1=extrema direita):**
 
-**1. CANDLES (velas japonesas com corpo e pavios):**
-
-Cores possíveis:
-- VERDE: movimento de alta normal
-- VERMELHO: movimento de baixa normal
-- MAGENTA (rosa/pink brilhante): sinal especial de VENDA
-- AZUL: sinal especial de COMPRA
-- AMARELO/DOURADO: indecisão/doji
-
-⚠️ CRÍTICO: MAGENTA ≠ VERMELHO! São cores DIFERENTES!
-
-**2. BANDAS (9 linhas paralelas no total):**
-
-- 4 linhas ACIMA do preço: cor CIANO/VERDE-ÁGUA
-- 1 linha CENTRAL: cor BRANCA (no meio)
-- 4 linhas ABAIXO do preço: cor LARANJA/MARROM
-
-As bandas podem estar: inclinadas para cima, para baixo, ou laterais.
-
-**3. BOX PRETO (canto superior esquerdo):**
-
-- Fundo preto sólido
-- Texto branco
-- Contém: nome do par, "Bias: COMPRA/VENDA/NEUTRO", Stop, Entrada, etc.
-
-**4. BOX ROXO (pode existir ou não):**
-
-- É um RETÂNGULO ROXO desenhado SOBRE os candles
-- Pode conter texto "LATERAL" dentro
-- ⚠️ NÃO é o texto "Supreme ROC" que fica na parte inferior!
-
-**5. HISTOGRAMA INFERIOR (barras verticais embaixo do gráfico):**
-
-Cores e significados:
-- AZUL/CIANO: pressão compradora forte
-- AMARELO/DOURADO: pressão fraca
-- VERMELHO: pressão vendedora forte
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 INSTRUÇÕES DE VERIFICAÇÃO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Analise a imagem da DIREITA para ESQUERDA.
-Preencha o formato abaixo com o que você VÊ:
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**1. CANDLES (últimos 5 visíveis, da direita→esquerda):**
-
-Posição 1 (extrema direita):
-- Cor do corpo: [VERDE/VERMELHO/MAGENTA/AZUL/AMARELO]
+Posição 1:
+- Cor: [VERDE/VERMELHO/BRANCO/CIANO/LARANJA]
 - Tamanho: [pequeno/médio/grande]
-- Pavios: [visíveis sim/não]
 
 Posição 2:
-- Cor do corpo: [...]
+- Cor: [...]
 - Tamanho: [...]
-- Pavios: [...]
 
 Posição 3:
-- Cor do corpo: [...]
+- Cor: [...]
 - Tamanho: [...]
-- Pavios: [...]
 
 Posição 4:
-- Cor do corpo: [...]
+- Cor: [...]
 - Tamanho: [...]
-- Pavios: [...]
 
 Posição 5:
-- Cor do corpo: [...]
+- Cor: [...]
 - Tamanho: [...]
-- Pavios: [...]
 
-⚠️ Lembre-se: MAGENTA (rosa brilhante) é diferente de VERMELHO!
+⚠️ Se não vê CIANO ou LARANJA, isso é normal - são sinais que podem não existir.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**2. BANDAS:**
+**2. BANDAS (conte cada linha individualmente):**
 
-Linhas ACIMA do preço:
+Superiores (acima do preço):
 - Quantidade: [número]
-- Cor que você vê: [...]
+- Progressão de cores: [do mais claro ao mais escuro]
 
-Linhas ABAIXO do preço:
+Inferiores (abaixo do preço):
 - Quantidade: [número]
-- Cor que você vê: [...]
+- Progressão de cores: [do mais claro ao mais escuro]
 
-Linha CENTRAL:
+Central:
 - Existe? [SIM/NÃO]
 - Cor: [...]
 
-Direção geral:
-- As bandas apontam para: [CIMA/BAIXO/LATERAL]
+Total de linhas: [soma]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**3. BOX PRETO (canto superior esquerdo):**
+**3. BOX PRETO:**
 
 Existe? [SIM/NÃO]
-
-Se SIM, transcreva a linha que contém "Bias:":
-[texto aqui]
+Linha com "Bias:": [transcreva]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**4. BOX ROXO (retângulo desenhado sobre os candles):**
+**4. BOX ROXO (retângulo sobre candles):**
 
-⚠️ Procure por um RETÂNGULO ROXO/MAGENTA desenhado sobre o gráfico de preços.
-⚠️ NÃO confunda com o texto "Supreme ROC" na parte de baixo.
-
-Existe um retângulo roxo sobre os candles? [SIM/NÃO]
+Existe retângulo roxo sobre o gráfico? [SIM/NÃO]
 
 Se SIM:
-- Aproximadamente onde começa: [...]
-- Aproximadamente onde termina: [...]
-- Tem texto dentro? [SIM/NÃO] Qual: [...]
+- Posição: [...]
+- Texto dentro: [...]
 
 Se NÃO:
-- Confirme: [Não há box roxo no gráfico]
+- Confirme: [Não há box roxo]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**5. HISTOGRAMA INFERIOR (últimas 5 barras, direita→esquerda):**
+**5. HISTOGRAMA (últimas 5 barras):**
 
-Barra 1 (extrema direita):
-- Cor: [AZUL/AMARELO/VERMELHO]
-- Tamanho: [pequena/média/grande]
-
-Barra 2:
-- Cor: [...]
-- Tamanho: [...]
-
-Barra 3:
-- Cor: [...]
-- Tamanho: [...]
-
-Barra 4:
-- Cor: [...]
-- Tamanho: [...]
-
-Barra 5:
-- Cor: [...]
-- Tamanho: [...]
+Barra 1: [AZUL/VERMELHO/AMARELO], [tamanho]
+Barra 2: [cor], [tamanho]
+Barra 3: [cor], [tamanho]
+Barra 4: [cor], [tamanho]
+Barra 5: [cor], [tamanho]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-LEMBRE-SE:
-- Seja objetivo e literal
-- Use apenas as cores que descrevi
-- Se não tiver certeza, diga "Não consegui identificar"
-- Não invente elementos que não existem
 `;
 
 module.exports = async (req, res) => {
@@ -199,13 +194,13 @@ module.exports = async (req, res) => {
             });
         }
         
-        console.log('📤 Sending to Gemini...');
+        console.log('📤 Sending to Gemini with visual reference table...');
         
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
-                temperature: 0.05,  // Bem baixo para ser literal
+                temperature: 0.05,
                 maxOutputTokens: 2500,
                 thinkingConfig: { thinkingBudget: 0 }
             }
