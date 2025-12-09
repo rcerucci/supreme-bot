@@ -63,30 +63,34 @@ Tendência: [crescendo/decrescendo/estáveis]?
 💡 IMPORTANTE: Seja honesto, use suas cores naturais, conte cuidadosamente.
 `;
 
-async function preprocessImage(imagePath) {
-    try {
-        const buffer = fs.readFileSync(imagePath);
-        const processedBuffer = await sharp(buffer)
-            .png({ compressionLevel: 0 })
-            .toBuffer();
-        return processedBuffer.toString('base64');
-    } catch (error) {
-        console.error('❌ Preprocessing error:', error.message);
-        throw error;
-    }
-}
-
-async function testExploratoryAnalysis(imagePath) {
-    console.log('\n' + '═'.repeat(60));
-    console.log('🔍 TESTE EXPLORATÓRIO - PERCEPÇÃO DO GEMINI');
-    console.log('═'.repeat(60));
-    console.log(`📁 Imagem: ${path.basename(imagePath)}\n`);
+module.exports = async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    
+    console.log('🔍 Iniciando análise exploratória...');
     
     try {
-        console.log('🔧 Processando imagem (PNG sem compressão)...');
-        const base64Image = await preprocessImage(imagePath);
-        const imageSizeKB = (base64Image.length * 0.75 / 1024).toFixed(2);
-        console.log(`   Tamanho: ${imageSizeKB} KB (base64)\n`);
+        const { screenshot } = req.body;
+        
+        if (!screenshot) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Screenshot required'
+            });
+        }
+        
+        console.log('🔧 Processing image...');
+        const buffer = Buffer.from(screenshot, 'base64');
+        const processed = await sharp(buffer)
+            .png({ compressionLevel: 0 })
+            .toBuffer();
+        
+        const base64Image = processed.toString('base64');
+        console.log(`📊 Image size: ${(processed.length / 1024).toFixed(2)} KB`);
         
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
@@ -98,7 +102,8 @@ async function testExploratoryAnalysis(imagePath) {
             }
         });
         
-        const contents = [
+        console.log('📤 Sending to Gemini...');
+        const result = await model.generateContent([
             {
                 inlineData: {
                     data: base64Image,
@@ -106,76 +111,33 @@ async function testExploratoryAnalysis(imagePath) {
                 }
             },
             { text: EXPLORATORY_PROMPT }
-        ];
+        ]);
         
-        console.log('📤 Enviando para Gemini...\n');
-        const startTime = Date.now();
-        const result = await model.generateContent(contents);
-        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-        
-        const description = result.response.text();
+        const text = result.response.text();
         const usage = result.response.usageMetadata;
         
-        console.log('═'.repeat(60));
-        console.log('📊 ANÁLISE DO GEMINI:');
-        console.log('═'.repeat(60));
-        console.log(description);
-        console.log('\n' + '═'.repeat(60));
-        console.log('📈 MÉTRICAS:');
-        console.log('═'.repeat(60));
-        console.log(`⏱️  Tempo: ${elapsed}s`);
-        console.log(`📥 Tokens entrada: ${usage?.promptTokenCount || 0}`);
-        console.log(`📤 Tokens saída: ${usage?.candidatesTokenCount || 0}`);
-        console.log(`💰 Total tokens: ${(usage?.promptTokenCount || 0) + (usage?.candidatesTokenCount || 0)}`);
-        console.log(`🎯 Modelo: ${MODEL}`);
-        console.log('═'.repeat(60) + '\n');
+        console.log(`✅ Analysis complete`);
+        console.log(`📊 Tokens: ${usage?.promptTokenCount} in / ${usage?.candidatesTokenCount} out`);
         
-        const outputPath = imagePath.replace('.png', '_gemini_analysis.txt');
-        const output = `TESTE EXPLORATÓRIO - ${new Date().toISOString()}
-Imagem: ${path.basename(imagePath)}
-Modelo: ${MODEL}
-Tempo: ${elapsed}s
-Tokens: ${usage?.promptTokenCount} in / ${usage?.candidatesTokenCount} out
-
-═══════════════════════════════════════════════════════════
-ANÁLISE:
-═══════════════════════════════════════════════════════════
-${description}
-`;
-        
-        fs.writeFileSync(outputPath, output);
-        console.log(`💾 Resultado salvo em: ${outputPath}\n`);
-        
-        return {
-            success: true,
-            description,
-            metrics: {
-                time: elapsed,
-                tokensIn: usage?.promptTokenCount || 0,
-                tokensOut: usage?.candidatesTokenCount || 0,
-                imageSize: imageSizeKB
+        return res.status(200).json({
+            status: 'success',
+            description: text,
+            tokens: {
+                input: usage?.promptTokenCount || 0,
+                output: usage?.candidatesTokenCount || 0,
+                thinking: usage?.thoughtsTokenCount || 0,
+                total: usage?.totalTokenCount || 0
             }
-        };
+        });
         
     } catch (error) {
-        console.error('❌ Erro:', error.message);
-        return { success: false, error: error.message };
+        console.error('❌ Error:', error.message);
+        console.error('Stack:', error.stack);
+        
+        return res.status(500).json({
+            status: 'error',
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
-}
-
-async function main() {
-    const imagePath = process.argv[2] || './examples_jpeg/exemple.png';
-    
-    if (!fs.existsSync(imagePath)) {
-        console.error(`❌ Imagem não encontrada: ${imagePath}`);
-        process.exit(1);
-    }
-    
-    await testExploratoryAnalysis(imagePath);
-}
-
-if (require.main === module) {
-    main();
-}
-
-module.exports = { testExploratoryAnalysis };
+};
