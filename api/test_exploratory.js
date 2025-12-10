@@ -4,80 +4,77 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
-// api/test_exploratory.js - VERSÃO MELHORADA
-
 const ANALYSIS_PROMPT = `
-You are analyzing a trading chart with 2 components.
+You are analyzing a trading chart with a RED VERTICAL LINE.
 
-CRITICAL: Focus ONLY on the RIGHTMOST 10-20% of the image.
-Ignore everything on the left side - only analyze the EXTREME RIGHT END.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL INSTRUCTION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+There is a RED VERTICAL LINE in the image.
+
+ONLY ANALYZE what is TO THE RIGHT of this red line.
+COMPLETELY IGNORE everything to the left of the red line.
+
+The red line marks: "ANALYZE FROM HERE →"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PART 1 - BANDS (top section): 9 parallel white lines
+PART 1 - BANDS (9 white lines at top):
 
-Look at where these 9 lines END (rightmost tips):
+Look ONLY at the portion RIGHT of the red line:
 
-1. SPACING: At the right end, are all 9 lines maintaining CONSTANT distance from each other?
-   - PARALLEL = distance stays the same
-   - SQUEEZE = lines getting closer together (converging)
+1. SPACING: Are the 9 lines maintaining constant distance?
+   - PARALLEL = lines stay same distance apart
+   - SQUEEZE = lines getting closer (converging toward center)
    - EXPANSION = lines getting farther apart (diverging)
 
-2. DIRECTION: At the right end, are ALL 9 line tips pointing the SAME direction?
-   - UP = tips angling upward
-   - DOWN = tips angling downward
-   - HORIZONTAL = tips flat/sideways
+2. DIRECTION: Which way are the line tips pointing?
+   - UP = angling upward /
+   - DOWN = angling downward \\
+   - HORIZONTAL = staying flat —
    - MIXED = some up, some down
 
-3. SMOOTHNESS: Are the rightmost portions smooth or jagged?
-   - SMOOTH = clean curves
-   - CHOPPY = very jagged/erratic
+3. SMOOTHNESS: SMOOTH / CHOPPY
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PART 2 - HISTOGRAM (bottom): Vertical white bars
+PART 2 - HISTOGRAM (vertical bars at bottom):
 
-Look at the LAST 5-10 bars on the RIGHT:
+Look ONLY at bars RIGHT of the red line:
 
-1. POSITION: Are the rightmost bars above or below the horizontal center?
-   - ABOVE = bars extending upward from center
-   - BELOW = bars extending downward from center
-   - MIXED = some above, some below
+1. POSITION: Are bars above or below the horizontal center?
+   - ABOVE = bars extending upward
+   - BELOW = bars extending downward
+   - MIXED = some up, some down
 
-2. TREND: Are the rightmost bars getting bigger or smaller?
-   - GROWING = each bar taller than previous
-   - SHRINKING = each bar shorter than previous
+2. TREND: Are bars getting bigger or smaller?
+   - GROWING = increasing height
+   - SHRINKING = decreasing height
    - FLAT = similar sizes
 
-3. CONSISTENCY: Do the rightmost bars stay on same side of center?
-   - CONSISTENT = all above OR all below
-   - OSCILLATING = jumping between above and below
+3. CONSISTENCY: CONSISTENT / OSCILLATING
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-IMPORTANT: 
-- Only analyze the RIGHTMOST portion
-- Ignore historical patterns on the left
-- Focus on current state (right edge)
-
-Answer ONLY with valid JSON (no markdown, no backticks):
+Return JSON only:
 {
   "bands": {
-    "spacing": "PARALLEL" | "SQUEEZE" | "EXPANSION",
-    "direction": "UP" | "DOWN" | "HORIZONTAL" | "MIXED",
-    "smoothness": "SMOOTH" | "CHOPPY",
+    "spacing": "PARALLEL|SQUEEZE|EXPANSION",
+    "direction": "UP|DOWN|HORIZONTAL|MIXED",
+    "smoothness": "SMOOTH|CHOPPY",
     "valid": true/false
   },
   "histogram": {
-    "position": "ABOVE" | "BELOW" | "MIXED",
-    "trend": "GROWING" | "SHRINKING" | "FLAT",
-    "consistency": "CONSISTENT" | "OSCILLATING",
-    "momentum": "BULLISH" | "BEARISH" | "WEAK"
+    "position": "ABOVE|BELOW|MIXED",
+    "trend": "GROWING|SHRINKING|FLAT",
+    "consistency": "CONSISTENT|OSCILLATING",
+    "momentum": "BULLISH|BEARISH|WEAK"
   },
   "setup": {
     "confluence": true/false,
-    "bias": "BULLISH" | "BEARISH" | "INVALID",
-    "quality": "STRONG" | "WEAK" | "POOR"
+    "bias": "BULLISH|BEARISH|INVALID",
+    "quality": "STRONG|WEAK|POOR"
   }
 }
 `;
