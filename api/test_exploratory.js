@@ -4,44 +4,61 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
+// api/test_exploratory.js - VERSÃO MELHORADA
+
 const ANALYSIS_PROMPT = `
-You are analyzing a trading chart with 2 components:
+You are analyzing a trading chart with 2 components.
 
-PART 1 - BANDS (top section): 9 parallel bands
-Look ONLY at the extreme right end of these bands.
+CRITICAL: Focus ONLY on the RIGHTMOST 10-20% of the image.
+Ignore everything on the left side - only analyze the EXTREME RIGHT END.
 
-Check:
-1. SPACING: Are all 9 bands maintaining CONSTANT distance?
-   - PARALLEL = good
-   - SQUEEZE = converging (bad)
-   - EXPANSION = diverging (bad)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-2. DIRECTION: Are ALL 9 bands pointing the SAME way?
-   - UP = bullish
-   - DOWN = bearish
-   - HORIZONTAL or MIXED = bad
+PART 1 - BANDS (top section): 9 parallel white lines
 
-3. SMOOTHNESS: Are lines relatively smooth (not too jagged)?
-   - SMOOTH = good
-   - CHOPPY = bad
+Look at where these 9 lines END (rightmost tips):
 
-PART 2 - HISTOGRAM (bottom section): Vertical bars
-Look ONLY at the extreme right end (last 5-10 bars).
+1. SPACING: At the right end, are all 9 lines maintaining CONSTANT distance from each other?
+   - PARALLEL = distance stays the same
+   - SQUEEZE = lines getting closer together (converging)
+   - EXPANSION = lines getting farther apart (diverging)
 
-Check:
-1. POSITION: Are bars above or below the center line?
-   - ABOVE = positive/bullish
-   - BELOW = negative/bearish
-   - MIXED = unclear
+2. DIRECTION: At the right end, are ALL 9 line tips pointing the SAME direction?
+   - UP = tips angling upward
+   - DOWN = tips angling downward
+   - HORIZONTAL = tips flat/sideways
+   - MIXED = some up, some down
 
-2. TREND: Are bars consistently growing?
-   - GROWING = momentum increasing
-   - SHRINKING = momentum decreasing
-   - FLAT = no clear trend
+3. SMOOTHNESS: Are the rightmost portions smooth or jagged?
+   - SMOOTH = clean curves
+   - CHOPPY = very jagged/erratic
 
-3. CONSISTENCY: Are bars uniform in direction?
-   - CONSISTENT = all same side of line
-   - OSCILLATING = jumping above/below
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PART 2 - HISTOGRAM (bottom): Vertical white bars
+
+Look at the LAST 5-10 bars on the RIGHT:
+
+1. POSITION: Are the rightmost bars above or below the horizontal center?
+   - ABOVE = bars extending upward from center
+   - BELOW = bars extending downward from center
+   - MIXED = some above, some below
+
+2. TREND: Are the rightmost bars getting bigger or smaller?
+   - GROWING = each bar taller than previous
+   - SHRINKING = each bar shorter than previous
+   - FLAT = similar sizes
+
+3. CONSISTENCY: Do the rightmost bars stay on same side of center?
+   - CONSISTENT = all above OR all below
+   - OSCILLATING = jumping between above and below
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPORTANT: 
+- Only analyze the RIGHTMOST portion
+- Ignore historical patterns on the left
+- Focus on current state (right edge)
 
 Answer ONLY with valid JSON (no markdown, no backticks):
 {
@@ -63,11 +80,6 @@ Answer ONLY with valid JSON (no markdown, no backticks):
     "quality": "STRONG" | "WEAK" | "POOR"
   }
 }
-
-Valid setup requires:
-- Bands: PARALLEL + (UP or DOWN) + SMOOTH
-- Histogram: CONSISTENT direction + GROWING
-- Confluence: Bands and histogram pointing same direction
 `;
 
 module.exports = async (req, res) => {
