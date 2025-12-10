@@ -1,61 +1,31 @@
-// api/test_bands_histogram.js
+// api/test_exploratory.js
+
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const sharp = require('sharp');
 
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
 const ANALYSIS_PROMPT = `
-You are analyzing a trading chart with a RED VERTICAL LINE.
+Analyze this trading chart section with 2 components:
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-CRITICAL INSTRUCTION:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 1 - BANDS (9 white lines):
 
-There is a RED VERTICAL LINE in the image.
+1. SPACING: Are lines maintaining constant distance?
+   PARALLEL / SQUEEZE (converging) / EXPANSION (diverging)
 
-ONLY ANALYZE what is TO THE RIGHT of this red line.
-COMPLETELY IGNORE everything to the left of the red line.
-
-The red line marks: "ANALYZE FROM HERE →"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-PART 1 - BANDS (9 white lines at top):
-
-Look ONLY at the portion RIGHT of the red line:
-
-1. SPACING: Are the 9 lines maintaining constant distance?
-   - PARALLEL = lines stay same distance apart
-   - SQUEEZE = lines getting closer (converging toward center)
-   - EXPANSION = lines getting farther apart (diverging)
-
-2. DIRECTION: Which way are the line tips pointing?
-   - UP = angling upward /
-   - DOWN = angling downward \\
-   - HORIZONTAL = staying flat —
-   - MIXED = some up, some down
+2. DIRECTION: Which way are tips pointing?
+   UP / DOWN / HORIZONTAL / MIXED
 
 3. SMOOTHNESS: SMOOTH / CHOPPY
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 2 - HISTOGRAM (vertical bars):
 
-PART 2 - HISTOGRAM (vertical bars at bottom):
+1. POSITION: ABOVE center / BELOW center / MIXED
 
-Look ONLY at bars RIGHT of the red line:
-
-1. POSITION: Are bars above or below the horizontal center?
-   - ABOVE = bars extending upward
-   - BELOW = bars extending downward
-   - MIXED = some up, some down
-
-2. TREND: Are bars getting bigger or smaller?
-   - GROWING = increasing height
-   - SHRINKING = decreasing height
-   - FLAT = similar sizes
+2. TREND: GROWING / SHRINKING / FLAT
 
 3. CONSISTENCY: CONSISTENT / OSCILLATING
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Return JSON only:
 {
@@ -97,6 +67,25 @@ module.exports = async (req, res) => {
             });
         }
         
+        // CROP: últimos 15% da imagem (extrema direita)
+        const buffer = Buffer.from(screenshot, 'base64');
+        const metadata = await sharp(buffer).metadata();
+        
+        const cropWidth = Math.floor(metadata.width * 0.15);
+        const cropX = metadata.width - cropWidth;
+        
+        const croppedBuffer = await sharp(buffer)
+            .extract({
+                left: cropX,
+                top: 0,
+                width: cropWidth,
+                height: metadata.height
+            })
+            .toBuffer();
+        
+        const croppedBase64 = croppedBuffer.toString('base64');
+        
+        // Enviar SOMENTE o crop para Gemini
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
             model: MODEL,
@@ -110,7 +99,7 @@ module.exports = async (req, res) => {
         const result = await model.generateContent([
             {
                 inlineData: {
-                    data: screenshot,
+                    data: croppedBase64,
                     mimeType: 'image/png'
                 }
             },
@@ -120,18 +109,17 @@ module.exports = async (req, res) => {
         const text = result.response.text();
         const usage = result.response.usageMetadata;
         
-        // Parse JSON response
         let analysis;
         try {
             analysis = JSON.parse(text);
         } catch (e) {
-            // Se não for JSON válido, retornar texto bruto
             analysis = { raw: text, parse_error: true };
         }
         
         return res.status(200).json({
             status: 'success',
             analysis: analysis,
+            cropped_region: `Last ${cropWidth}px (${Math.floor(cropWidth/metadata.width*100)}%)`,
             tokens: {
                 input: usage?.promptTokenCount || 0,
                 output: usage?.candidatesTokenCount || 0,
