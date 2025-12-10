@@ -6,61 +6,27 @@ const sharp = require('sharp');
 const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
-const ANALYSIS_PROMPT = `
-Analyze this trading chart section:
+const BANDS_PROMPT = `
+You see 9 white lines on black background.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PART 1 - BANDS (top: 9 white lines)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Look at the RIGHTMOST tips of these lines (where they end).
 
-1. SPACING: Are lines maintaining constant distance?
-   - PARALLEL = distance stays same
-   - SQUEEZE = lines converging (getting closer)
-   - EXPANSION = lines diverging (getting farther)
+Answer 3 questions:
 
-2. DIRECTION: Which way are tips pointing?
-   - UP / DOWN / HORIZONTAL / MIXED
+1. Are the outer lines getting CLOSER to the center line, FARTHER from center line, or staying SAME DISTANCE?
+   Answer: CLOSER / FARTHER / SAME
 
-3. SMOOTHNESS: SMOOTH / CHOPPY
+2. Are the tips pointing UP, DOWN, or FLAT?
+   Answer: UP / DOWN / FLAT
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PART 2 - HISTOGRAM (bottom: vertical white bars)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. Are the lines SMOOTH or JAGGED?
+   Answer: SMOOTH / JAGGED
 
-The histogram has a HORIZONTAL CENTER LINE (zero line).
-
-1. POSITION: Are the bars extending above or below this CENTER LINE?
-   - ABOVE = bars extending UPWARD from center line (positive values)
-   - BELOW = bars extending DOWNWARD from center line (negative values)
-   - MIXED = some bars up, some bars down
-
-2. TREND: Are bars getting bigger or smaller?
-   - GROWING / SHRINKING / FLAT
-
-3. CONSISTENCY: Are bars on same side of center line?
-   - CONSISTENT / OSCILLATING
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Return JSON only:
+Return ONLY this JSON (no other text):
 {
-  "bands": {
-    "spacing": "PARALLEL|SQUEEZE|EXPANSION",
-    "direction": "UP|DOWN|HORIZONTAL|MIXED",
-    "smoothness": "SMOOTH|CHOPPY",
-    "valid": true/false
-  },
-  "histogram": {
-    "position": "ABOVE|BELOW|MIXED",
-    "trend": "GROWING|SHRINKING|FLAT",
-    "consistency": "CONSISTENT|OSCILLATING",
-    "momentum": "BULLISH|BEARISH|WEAK"
-  },
-  "setup": {
-    "confluence": true/false,
-    "bias": "BULLISH|BEARISH|INVALID",
-    "quality": "STRONG|WEAK|POOR"
-  }
+  "spacing": "CLOSER|FARTHER|SAME",
+  "direction": "UP|DOWN|FLAT",
+  "smoothness": "SMOOTH|JAGGED"
 }
 `;
 
@@ -76,17 +42,14 @@ module.exports = async (req, res) => {
         const { screenshot } = req.body;
         
         if (!screenshot) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Screenshot required'
-            });
+            return res.status(400).json({ status: 'error', message: 'Screenshot required' });
         }
         
-        // CROP: últimos 15% da imagem (extrema direita)
         const buffer = Buffer.from(screenshot, 'base64');
         const metadata = await sharp(buffer).metadata();
         
-        const cropWidth = Math.floor(metadata.width * 0.15);
+        // Crop: últimos 20% largura, toda altura
+        const cropWidth = Math.floor(metadata.width * 0.20);
         const cropX = metadata.width - cropWidth;
         
         const croppedBuffer = await sharp(buffer)
@@ -100,41 +63,42 @@ module.exports = async (req, res) => {
         
         const croppedBase64 = croppedBuffer.toString('base64');
         
-        // Enviar SOMENTE o crop para Gemini
         const genAI = new GoogleGenerativeAI(API_KEY);
         const model = genAI.getGenerativeModel({
             model: MODEL,
             generationConfig: {
-                temperature: 0.01,
-                maxOutputTokens: 1000,
+                temperature: 0,
+                maxOutputTokens: 200,
                 responseMimeType: 'application/json'
             }
         });
         
         const result = await model.generateContent([
-            {
-                inlineData: {
-                    data: croppedBase64,
-                    mimeType: 'image/png'
-                }
-            },
-            { text: ANALYSIS_PROMPT }
+            { inlineData: { data: croppedBase64, mimeType: 'image/png' } },
+            { text: BANDS_PROMPT }
         ]);
         
-        const text = result.response.text();
+        const analysis = JSON.parse(result.response.text());
         const usage = result.response.usageMetadata;
         
-        let analysis;
-        try {
-            analysis = JSON.parse(text);
-        } catch (e) {
-            analysis = { raw: text, parse_error: true };
-        }
+        // Traduzir para termos finais
+        const spacing = analysis.spacing === 'CLOSER' ? 'SQUEEZE' 
+                      : analysis.spacing === 'FARTHER' ? 'EXPANSION'
+                      : 'PARALLEL';
+        
+        const valid = spacing === 'PARALLEL' && 
+                     (analysis.direction === 'UP' || analysis.direction === 'DOWN') &&
+                     analysis.smoothness === 'SMOOTH';
         
         return res.status(200).json({
             status: 'success',
-            analysis: analysis,
-            cropped_region: `Last ${cropWidth}px (${Math.floor(cropWidth/metadata.width*100)}%)`,
+            bands: {
+                spacing: spacing,
+                direction: analysis.direction,
+                smoothness: analysis.smoothness,
+                valid: valid
+            },
+            raw: analysis,
             tokens: {
                 input: usage?.promptTokenCount || 0,
                 output: usage?.candidatesTokenCount || 0,
@@ -144,10 +108,6 @@ module.exports = async (req, res) => {
         
     } catch (error) {
         console.error('Error:', error.message);
-        
-        return res.status(500).json({
-            status: 'error',
-            message: error.message
-        });
+        return res.status(500).json({ status: 'error', message: error.message });
     }
 };
