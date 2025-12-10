@@ -7,25 +7,40 @@ const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
 const ANALYSIS_PROMPT = `
-Analyze this trading chart section with 2 components:
+Analyze this trading chart section:
 
-PART 1 - BANDS (9 white lines):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 1 - BANDS (top: 9 white lines)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 1. SPACING: Are lines maintaining constant distance?
-   PARALLEL / SQUEEZE (converging) / EXPANSION (diverging)
+   - PARALLEL = distance stays same
+   - SQUEEZE = lines converging (getting closer)
+   - EXPANSION = lines diverging (getting farther)
 
 2. DIRECTION: Which way are tips pointing?
-   UP / DOWN / HORIZONTAL / MIXED
+   - UP / DOWN / HORIZONTAL / MIXED
 
 3. SMOOTHNESS: SMOOTH / CHOPPY
 
-PART 2 - HISTOGRAM (vertical bars):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 2 - HISTOGRAM (bottom: vertical white bars)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. POSITION: ABOVE center / BELOW center / MIXED
+The histogram has a HORIZONTAL CENTER LINE (zero line).
 
-2. TREND: GROWING / SHRINKING / FLAT
+1. POSITION: Are the bars extending above or below this CENTER LINE?
+   - ABOVE = bars extending UPWARD from center line (positive values)
+   - BELOW = bars extending DOWNWARD from center line (negative values)
+   - MIXED = some bars up, some bars down
 
-3. CONSISTENCY: CONSISTENT / OSCILLATING
+2. TREND: Are bars getting bigger or smaller?
+   - GROWING / SHRINKING / FLAT
+
+3. CONSISTENCY: Are bars on same side of center line?
+   - CONSISTENT / OSCILLATING
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Return JSON only:
 {
