@@ -7,19 +7,25 @@ const API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-2.5-flash-lite';
 
 const BANDS_PROMPT = `
-You see 9 white lines on black background.
+You see 9 white lines on a dark grid background.
 
-Look at the RIGHTMOST tips of these lines (where they end).
+The grid has perpendicular lines (90° X and Y axes) as reference.
 
-Answer 3 questions:
+Look at the RIGHTMOST tips of the 9 white lines.
 
-1. Are the outer lines getting CLOSER to the center line, FARTHER from center line, or staying SAME DISTANCE?
+Answer 3 questions using the grid as reference:
+
+1. SPACING: Are the outer white lines getting CLOSER to the center line, FARTHER from it, or staying SAME DISTANCE?
+   Use the grid squares to measure distance between lines.
    Answer: CLOSER / FARTHER / SAME
 
-2. Are the tips pointing UP, DOWN, or FLAT?
+2. DIRECTION: Are the white line tips pointing UP, DOWN, or FLAT relative to the horizontal grid lines?
+   UP = tips angling above horizontal
+   DOWN = tips angling below horizontal  
+   FLAT = tips following horizontal grid lines
    Answer: UP / DOWN / FLAT
 
-3. Are the lines SMOOTH or JAGGED?
+3. SMOOTHNESS: Are the white lines SMOOTH or JAGGED?
    Answer: SMOOTH / JAGGED
 
 Return ONLY this JSON (no other text):
